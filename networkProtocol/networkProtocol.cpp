@@ -1,6 +1,4 @@
-﻿// networkProtocol.cpp : Ten plik zawiera funkcję „main”. W nim rozpoczyna się i kończy wykonywanie programu.
-//
-#include <iostream>
+﻿#include <iostream>
 #include <vector>
 #include <ctime>
 #include <cstdlib>
@@ -14,6 +12,7 @@ int main()
 {
 	Client client;
 	srand(time(NULL));
+
 	client.run();
 	return 0;
 }

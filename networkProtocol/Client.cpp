@@ -22,7 +22,7 @@ Client::Client() : window(sf::VideoMode(1024, 768), "Chat Client"), background(s
 	userText.setCharacterSize(30);
 	userText.setFillColor(sf::Color(51, 153, 255));
 	userText.setPosition(sf::Vector2f(10, 728));
-	userText.setString("Text test");
+	userText.setString("Type here");
 
 	background.setFillColor(sf::Color(50, 50, 50));
 	window.setFramerateLimit(60);
@@ -32,13 +32,15 @@ Client::Client() : window(sf::VideoMode(1024, 768), "Chat Client"), background(s
 		this->username += (unsigned char)rand() % 24 + 97;
 	}
 
-	addMessage("client working on " + sf::IpAddress::getLocalAddress().toString(), this->messages, this->systemFont, 0 - 1);
-	addMessage("your name is " + this->username, this->messages, this->systemFont, 0 - 1);
+	this->deliveredColor = sf::Color(192, 192, 192);
+	this->readedColor = sf::Color(255, 255, 255);
+	this->sentColor = sf::Color(100, 100, 100);
 
-	this->deliveredColor = sf::Color(255, 255, 255);
-	this->sentColor = sf::Color(192, 192, 192);
 	this->errorColor = sf::Color(255, 0, 0);
 	this->serverColor = sf::Color(204, 204, 0);
+
+	addMessage("client working on " + sf::IpAddress::getLocalAddress().toString(), 0 - 1);
+	addMessage("your name is " + this->username, 0 - 1);
 }
 
 void Client::run()
@@ -54,7 +56,7 @@ void Client::run()
 			{
 				if (event.text.unicode > 31 && event.text.unicode < 126) // standard letters and marks
 				{
-					//40 litery mieszcz¹ siê na ekranie
+					//40 liter mieœci siê na ekranie
 					if (this->userText.getString().toAnsiString().length() % 40 == 0 && this->userText.getString().toAnsiString().length() != 0)
 					{
 						//adds \n at the end of the line
@@ -89,21 +91,24 @@ void Client::run()
 						if (this->userText.getString().toAnsiString()[0] == '/')
 						{
 							interpreteCommand(this->userText.getString().toAnsiString(), this->messages, this->chatFont);
+							std::cout << "Command interpreted" << std::endl;
 						}
 						else
 						{
-							addMessage(this->userText.getString().toAnsiString(), this->messages, this->chatFont, 0);
+							addMessage(this->userText.getString().toAnsiString(), messageId);
 
 							std::vector<UINT8> msg = toUINTtab(this->userText.getString().toAnsiString());
-							Comunicate message{ 7,0,messageId,this->sessionId,this->userText.getString().toAnsiString().length(),msg };
+							Comunicate message{ 7,0,this->messageId,this->sessionId,this->userText.getString().toAnsiString().length(),msg };
 
 							sf::Packet messagePacket;
 							messagePacket << message;
 							this->udpSocket.send(messagePacket, this->serverIP, this->serverPort);
+							this->messageId++;
 						}
+						std::cout << "Clearing string" << std::endl;
 						this->userText.setString("");
 						this->userText.setPosition(sf::Vector2f(10, 728));
-
+						std::cout << "String cleared" << std::endl;
 					}
 
 				}
@@ -127,7 +132,7 @@ void Client::run()
 					std::cout << "---" << receivedComunicate.operation << ' ' << receivedComunicate.answer << std::endl;
 					if (receivedComunicate.sessionId != this->sessionId)
 					{
-						std::cout << "---" << receivedComunicate.operation << ' ' << receivedComunicate.answer << std::endl;
+						std::cout << "---" << receivedComunicate.operation << "-" << receivedComunicate.answer << "-" << std::endl;
 						std::cout << "wrong session ID " << receivedComunicate.sessionId << std::endl;
 						std::cout << "should be " << this->sessionId << std::endl;
 						break;
@@ -137,11 +142,26 @@ void Client::run()
 
 					}
 
-					else if (receivedComunicate.operation == 7)
+					else if (receivedComunicate.operation == 7)//msg
 					{
-						if (receivedComunicate.answer == 7)
+						if (receivedComunicate.answer == 0)//msg 
 						{
-							addMessage(this->to_string(receivedComunicate), this->messages, this->systemFont, 0 - 1);
+						
+						}
+						if (receivedComunicate.answer == 3)//msg ack
+						{
+							for (auto& message : messages)
+							{
+								if (message.first == receivedComunicate.messageId)
+								{
+
+									message.second.setFillColor(deliveredColor);
+								}
+							}
+						}
+						if (receivedComunicate.answer == 7)//msg server
+						{
+							addMessage(this->to_string(receivedComunicate), 0 - 1);
 						}
 					}
 				}
@@ -159,7 +179,7 @@ void Client::run()
 	}
 }
 
-void Client::addMessage(std::string message, std::vector<std::pair<unsigned int, sf::Text>>& messages, sf::Font& chatFont, int16_t messageId = 0)
+void Client::addMessage(std::string message, int16_t messageId = 0)
 {
 	sf::Text newMessage;
 	newMessage.setFont(chatFont);
@@ -203,7 +223,7 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 		this->serverIP = sf::IpAddress(t1);
 
 		sf::Packet joinPacket;
-		Comunicate c1 = { 1,0,0,0,{this->username.length()},{toUINTtab(this->username)}, };
+		Comunicate c1 = { 1,0,0,0,this->username.length(),toUINTtab(this->username)};
 		joinPacket << c1;
 		this->udpSocket.send(joinPacket, this->serverIP, this->serverPort);
 
@@ -216,7 +236,7 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 		{
 			if (connectionClock.getElapsedTime().asSeconds() > 2)
 			{
-				addMessage("unable to reach " + this->serverIP.toString(), messages, this->systemFont, 0 - 1);
+				addMessage("unable to reach " + this->serverIP.toString(), 0 - 1);
 				return;
 			}
 		}
@@ -227,14 +247,16 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 		if (receivedComunicate.operation == 1 && receivedComunicate.answer == 7)
 		{
 			this->sessionId = receivedComunicate.sessionId;
-			addMessage("succesfully joined server " + this->serverIP.toString(), messages, this->systemFont, 0 - 1);
-			addMessage("session id is: " + std::to_string(receivedComunicate.sessionId), messages, this->systemFont, 0 - 1);
+			addMessage("succesfully joined server " + this->serverIP.toString(), 0 - 1);
+			addMessage("session id is: " + std::to_string(receivedComunicate.sessionId), 0 - 1);
 		}
 		else
 		{
-			addMessage("server sent wrong answer ", messages, this->systemFont, 0 - 1);
+			addMessage("server sent wrong answer ", 0 - 1);
 			return;
 		}
+
+		std::cout << "Joined succesfully" << std::endl;
 	}
 	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/invite.*")))
 	{
@@ -262,7 +284,7 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 	}
 	else
 	{
-		addMessage("unrecognised command", messages, this->systemFont, 0 - 1);
+		addMessage("unrecognised command", 0 - 1);
 	}
 }
 
@@ -280,8 +302,9 @@ void operator>>(sf::Packet& packet, Client::Comunicate& comunicate)
 {
 	packet >> comunicate.operation >> comunicate.answer >> comunicate.messageId >> comunicate.sessionId >> comunicate.datasize;
 	UINT8 data;
-	for (uint32_t i = 0; i < comunicate.datasize; i++)
+	for (int32_t i = 0; i < comunicate.datasize; i++)
 	{
+		std::cout << i << std::endl;
 		packet >> data;
 		comunicate.data.push_back(data);
 	}

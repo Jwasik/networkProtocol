@@ -13,6 +13,7 @@ class Client
 {
 private:
 	sf::Color deliveredColor;
+	sf::Color readedColor;
 	sf::Color sentColor;
 	sf::Color errorColor;
 	sf::Color serverColor;
@@ -23,7 +24,7 @@ private:
 		UINT8 answer;//3b
 		int16_t messageId;//16b
 		uint32_t sessionId;//32b
-		uint32_t datasize;//32b
+		int32_t datasize;//32b
 		std::vector<UINT8> data;
 	};
 
@@ -46,7 +47,7 @@ private:
 	std::string to_string(Comunicate&);
 
 	std::vector<UINT8> toUINTtab(std::string string);
-	void addMessage(std::string, std::vector<std::pair<unsigned int, sf::Text>>&, sf::Font&, int16_t);
+	void addMessage(std::string,int16_t);
 	void moveMessages(sf::Vector2f, std::vector<std::pair<unsigned int, sf::Text>>&);
 	void moveMessages(int, std::vector<std::pair<unsigned int, sf::Text>>&);
 	void interpreteCommand(std::string, std::vector<std::pair<unsigned int, sf::Text>>&, sf::Font&);
