@@ -27,20 +27,14 @@ Client::Client() : window(sf::VideoMode(1024, 768), "Chat Client"), background(s
 	background.setFillColor(sf::Color(50, 50, 50));
 	window.setFramerateLimit(60);
 
-	for (unsigned int i = 0; i < 4; i++)
-	{
-		this->username += (unsigned char)rand() % 24 + 97;
-	}
-
 	this->deliveredColor = sf::Color(192, 192, 192);
 	this->readedColor = sf::Color(255, 255, 255);
 	this->sentColor = sf::Color(100, 100, 100);
-
+	this->clientColor = sf::Color(50, 170, 0);
 	this->errorColor = sf::Color(255, 0, 0);
 	this->serverColor = sf::Color(204, 204, 0);
 
 	addMessage("client working on " + sf::IpAddress::getLocalAddress().toString(), 0 - 1);
-	addMessage("your name is " + this->username, 0 - 1);
 }
 
 void Client::run()
@@ -132,21 +126,64 @@ void Client::run()
 					std::cout << "---" << receivedComunicate.operation << ' ' << receivedComunicate.answer << std::endl;
 					if (receivedComunicate.sessionId != this->sessionId)
 					{
-						std::cout << "---" << receivedComunicate.operation << "-" << receivedComunicate.answer << "-" << std::endl;
 						std::cout << "wrong session ID " << receivedComunicate.sessionId << std::endl;
 						std::cout << "should be " << this->sessionId << std::endl;
 						break;
 					}
-					if (receivedComunicate.operation == 3)
-					{
 
+					if (receivedComunicate.operation == 2)//invite
+					{
+						if (receivedComunicate.answer == 0)
+						{
+							//odebranie zaproszenia
+							addMessage("\nYou have new invitation. Type /accept or /deny", 0 - 2);
+
+							//wys³anie potwierdzenia
+							ackMessage(receivedComunicate.messageId);
+						}
+						if (receivedComunicate.answer == 1)//accept
+						{
+							//odebranie odpowiedzi
+							addMessage("\nClient accepted you invitation", 0 - 2);
+
+							//wys³anie potwierdzenia
+							ackMessage(receivedComunicate.messageId);
+						}
+						if (receivedComunicate.answer == 2)//deny
+						{
+							//odebranie odpowiedzi
+							addMessage("\nClient refused you invitation", 0 - 2);
+
+							//wys³anie potwierdzenia
+							ackMessage(receivedComunicate.messageId);
+						}
+						if (receivedComunicate.answer == 3)//b³¹d
+						{
+							for (auto& message : messages)
+							{
+								if (message.first == receivedComunicate.messageId)
+								{
+									if (message.second.getFillColor() == deliveredColor)
+									{
+										message.second.setFillColor(readedColor);
+									}
+									else message.second.setFillColor(deliveredColor);
+								}
+							}
+							addMessage("Cannot invite client", 0 - 2);
+						}
 					}
 
 					else if (receivedComunicate.operation == 7)//msg
 					{
 						if (receivedComunicate.answer == 0)//msg 
 						{
-						
+							//odebranie tekstu wiadomoœci
+							addMessage(this->to_string(receivedComunicate), 0 - 3);
+
+							//wys³anie potwierdzenia odebranie
+							ackMessage(receivedComunicate.messageId);
+
 						}
 						if (receivedComunicate.answer == 3)//msg ack
 						{
@@ -154,8 +191,11 @@ void Client::run()
 							{
 								if (message.first == receivedComunicate.messageId)
 								{
-
-									message.second.setFillColor(deliveredColor);
+									if (message.second.getFillColor() == deliveredColor)
+									{
+										message.second.setFillColor(readedColor);
+									}
+									else message.second.setFillColor(deliveredColor);
 								}
 							}
 						}
@@ -189,6 +229,7 @@ void Client::addMessage(std::string message, int16_t messageId = 0)
 	if (messageId == 0)newMessage.setFillColor(sentColor);
 	else if (messageId == 0 - 1)newMessage.setFillColor(errorColor);
 	else if (messageId == 0 - 2)newMessage.setFillColor(serverColor);
+	else if (messageId == 0 - 3)newMessage.setFillColor(clientColor);
 	else newMessage.setFillColor(sentColor);
 
 	moveMessages(1, messages);
@@ -219,11 +260,16 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 	std::cmatch match;
 	if (std::regex_match(t1.begin(), t1.end(), std::regex("^/join.*")))
 	{
+		if (this->serverIP != sf::IpAddress::None)
+		{
+			addMessage("\nYou are already connected. Type /disconnect to end session " + this->serverIP.toString(), 0 - 1);
+			return;
+		}
 		t1.erase(0, 6);
 		this->serverIP = sf::IpAddress(t1);
 
 		sf::Packet joinPacket;
-		Comunicate c1 = { 1,0,0,0,this->username.length(),toUINTtab(this->username)};
+		Comunicate c1 = { 1,0,0,0,0,std::vector<UINT8>() };
 		joinPacket << c1;
 		this->udpSocket.send(joinPacket, this->serverIP, this->serverPort);
 
@@ -237,6 +283,7 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 			if (connectionClock.getElapsedTime().asSeconds() > 2)
 			{
 				addMessage("unable to reach " + this->serverIP.toString(), 0 - 1);
+				this->serverIP = sf::IpAddress::None;
 				return;
 			}
 		}
@@ -252,40 +299,99 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 		}
 		else
 		{
-			addMessage("server sent wrong answer ", 0 - 1);
+			addMessage("cannot join server, server full", 0 - 1);
 			return;
 		}
 
 		std::cout << "Joined succesfully" << std::endl;
 	}
-	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/invite.*")))
+	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/invite")))
 	{
+		addMessage("Invite sent", messageId);
+		Comunicate c1 = { 2,0,messageId,this->sessionId,0,std::vector<UINT8>() };
 
-	}
-	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/create.*")))
-	{
+		sf::Packet invitePacket;
+		invitePacket << c1;
 
-	}
-	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/leave.*")))
-	{
-
+		this->udpSocket.send(invitePacket, this->serverIP, this->serverPort);
+		messageId++;
 	}
 	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/accept.*")))
 	{
+		addMessage("Acceptation sent", messageId);
+		Comunicate c1 = { 2,1,messageId,this->sessionId,0,std::vector<UINT8>() };
 
+		sf::Packet invitePacket;
+		invitePacket << c1;
+
+		this->udpSocket.send(invitePacket, this->serverIP, this->serverPort);
+		messageId++;
 	}
 	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/deny.*")))
 	{
+		addMessage("Rejection sent", messageId);
+		Comunicate c1 = { 2,2,messageId,this->sessionId,0,std::vector<UINT8>() };
 
+		sf::Packet invitePacket;
+		invitePacket << c1;
+
+		this->udpSocket.send(invitePacket, this->serverIP, this->serverPort);
+		messageId++;
 	}
-	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/exit.*")))
+	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/disconnect.*")))
 	{
+		if (this->serverIP == sf::IpAddress::None)
+		{
+			addMessage("You are not connected", messageId);
+			return;
+		}
+		addMessage("Disconnecting...", messageId);
+		Comunicate c1 = { 1,3,messageId,this->sessionId,0,std::vector<UINT8>() };
+		sf::Packet disconnectPacket;
+		disconnectPacket << c1;
+		this->udpSocket.send(disconnectPacket,this->serverIP,this->serverPort);
 
+		sf::Clock connectionClock;
+		sf::IpAddress receivedAddress;
+		unsigned short receivedPort = 0;
+		while (this->udpSocket.receive(disconnectPacket, receivedAddress, receivedPort) != sf::Socket::Status::Done)
+		{
+			if (connectionClock.getElapsedTime().asSeconds() > 2)
+			{
+				addMessage("Unable to reach server " + this->serverIP.toString(), 0 - 1);
+				break;
+			}
+		}
+		Comunicate receivedComunicate;
+		disconnectPacket >> receivedComunicate;
+
+		if (receivedComunicate.operation == 1 && receivedComunicate.answer == 3)
+		{
+			addMessage("Succesfully disconnected " + this->serverIP.toString(), 0 - 1);
+			this->serverIP = sf::IpAddress::None;
+			this->serverPort = 0;
+		}
+		else
+		{
+			addMessage("\nUnable to reach server, performing emergency cutoff" + this->serverIP.toString(), 0 - 1);
+			this->serverIP = sf::IpAddress::None;
+			this->serverPort = 0;
+		}
+		this->serverIP == sf::IpAddress::None;
+		messageId++;
 	}
 	else
 	{
 		addMessage("unrecognised command", 0 - 1);
 	}
+}
+
+void Client::ackMessage(int16_t messageId)
+{
+	Comunicate c1{7,3,messageId,this->sessionId,0,std::vector<UINT8>()};
+	sf::Packet ackPacket;
+	ackPacket << c1;
+	this->udpSocket.send(ackPacket, this->serverIP, this->serverPort);
 }
 
 sf::Packet& operator<<(sf::Packet& packet, Client::Comunicate& comunicate)
@@ -304,7 +410,6 @@ void operator>>(sf::Packet& packet, Client::Comunicate& comunicate)
 	UINT8 data;
 	for (int32_t i = 0; i < comunicate.datasize; i++)
 	{
-		std::cout << i << std::endl;
 		packet >> data;
 		comunicate.data.push_back(data);
 	}

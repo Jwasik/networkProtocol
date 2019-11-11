@@ -1,23 +1,20 @@
 KOMUNIKAT(3b), ODPOWIEDè(3b), ID_WIADOMOåCI(16b) , ID_SESJI(32b) ,ROZMIAR_DANYCH(32b)(liczba znakÛw), DANE
 
-3b 3b 16b 32b dane 32b = 64b + (32b + 32b) + 32*x
+3b 3b 16b 32b 32b dane = 64b + (32b + 32b) + 32*x
 
+001 - sesja
 001 000 DataSize ClientName 0  - proúba o przydzielenie numeru sesji (od klienta do serwera)
 001 011 0 0 0  - zakoÒczenie sesji
+001 110 0 0 0 - odmowa przy≥πczenia do serwera
 001 111 0 0 0 - przydzia≥ numeru sesji (od serwera do klienta)
 
-010 000 DataSize Data SessionID - wys≥anie informacji o innych klientach (nazwy w 'Data') (od serwera do klienta, zaraz po /join)
+010 - zaproszenia
+010 000 - zaproszenie do komunikacji
+010 001 - akceptacja zaproszenia
+010 010 - odmowa zaproszenia
+010 011 - b≥πd zaproszenia (wysy≥ane przez server razem z msg b≥Ídu)
 
-011 000 DataSize ClientName SessionID - /invite user (host1 to server)
-011 000 DataSize InviterName SessionID - /invite user (server to host2)
-011 111 DataSize InviterName SessionID - ack invite (od klienta do serwera)
-011 111 DataSize InvitedName SessionID - ack invite (od serwera do klienta)
-011 001 0 0 SessionID - /accept invite
-011 010 0 0 SessionID - /deny invite
-011 100 0 0 SessionID - /create room (+ack)
-011 011 0 0 SessionID - /exit room (+ack)
-
-
-111 000 DataSize Comunicate SessionID - wys≥anie wiadomoúci (od klienta do wszystkich w pokoju i od serwera do reszty klientÛw)
-111 111 DataSize Comunicate SessionID - wiadomoúÊ od serwera
-111 011 MessageId SessionId 0 0 - ack wiadomoúci
+111 - wiadomoúci
+111 000 MessageId SessionID DataSize Comunicate - wys≥anie wiadomoúci (od klienta do wszystkich w pokoju i od serwera do reszty klientÛw)
+111 111 MessageId SessionID DataSize Comunicate - wiadomoúÊ od serwera (np lista klientÛw)
+111 011 MessageId SessionId 0 0 - ack dowolnej wiadomoúci (invite,msg,deny ipt...)

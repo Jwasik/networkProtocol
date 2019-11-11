@@ -17,6 +17,7 @@ private:
 	sf::Color sentColor;
 	sf::Color errorColor;
 	sf::Color serverColor;
+	sf::Color clientColor;
 
 	struct Comunicate
 	{
@@ -40,7 +41,6 @@ private:
 	sf::IpAddress serverIP;
 	unsigned short serverPort;
 	unsigned int sessionId;
-	std::string username;
 
 	friend sf::Packet& operator<<(sf::Packet&, Comunicate&);
 	friend void operator>>(sf::Packet&, Comunicate&);
@@ -51,7 +51,7 @@ private:
 	void moveMessages(sf::Vector2f, std::vector<std::pair<unsigned int, sf::Text>>&);
 	void moveMessages(int, std::vector<std::pair<unsigned int, sf::Text>>&);
 	void interpreteCommand(std::string, std::vector<std::pair<unsigned int, sf::Text>>&, sf::Font&);
-
+	void ackMessage(int16_t);
 
 public:
 	Client();
