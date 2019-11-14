@@ -29,7 +29,7 @@ Client::Client() : window(sf::VideoMode(1024, 768), "Chat Client"), background(s
 
 	this->deliveredColor = sf::Color(192, 192, 192);
 	this->readedColor = sf::Color(255, 255, 255);
-	this->sentColor = sf::Color(100, 100, 100);
+	this->sentColor = sf::Color(10, 10, 10);
 	this->clientColor = sf::Color(50, 170, 0);
 	this->errorColor = sf::Color(255, 0, 0);
 	this->serverColor = sf::Color(204, 204, 0);
@@ -123,7 +123,7 @@ void Client::run()
 				if (this->udpSocket.receive(receivedPacket, receivedIP, receivedPort) == sf::Socket::Done)
 				{
 					receivedPacket >> receivedComunicate;
-					std::cout << "---" << receivedComunicate.operation << ' ' << receivedComunicate.answer << std::endl;
+					std::cout << "rec" << (int)receivedComunicate.operation << ' ' << (int)receivedComunicate.answer << std::endl;
 					if (receivedComunicate.sessionId != this->sessionId)
 					{
 						std::cout << "wrong session ID " << receivedComunicate.sessionId << std::endl;
@@ -289,7 +289,6 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 		}
 		Comunicate receivedComunicate;
 		joinPacket >> receivedComunicate;
-		std::cout << "---" << int(receivedComunicate.operation) << '-' << int(receivedComunicate.answer) << std::endl;
 
 		if (receivedComunicate.operation == 1 && receivedComunicate.answer == 7)
 		{
@@ -297,9 +296,15 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 			addMessage("succesfully joined server " + this->serverIP.toString(), 0 - 1);
 			addMessage("session id is: " + std::to_string(receivedComunicate.sessionId), 0 - 1);
 		}
+		else if(receivedComunicate.operation == 1 && receivedComunicate.answer == 6)
+		{
+			std::cout << "rec "<<receivedComunicate.operation << "---"+receivedComunicate.answer<< std::endl;
+			addMessage("cannot join server, server full", 0 - 1);
+			return;
+		}
 		else
 		{
-			addMessage("cannot join server, server full", 0 - 1);
+			addMessage("server cannot answer", 0 - 1);
 			return;
 		}
 
@@ -396,7 +401,18 @@ void Client::ackMessage(int16_t messageId)
 
 sf::Packet& operator<<(sf::Packet& packet, Client::Comunicate& comunicate)
 {
-	packet << comunicate.operation << comunicate.answer << comunicate.messageId << comunicate.sessionId << comunicate.datasize;
+	uint32_t pom = 0;
+	pom += comunicate.operation;
+	pom <<= 3;
+	pom += comunicate.answer;
+	pom <<= 16;
+	pom += comunicate.messageId;
+	pom <<= 10;
+
+	packet << pom;
+	packet << comunicate.sessionId;
+	packet << comunicate.datasize;
+
 	for (auto& letter : comunicate.data)
 	{
 		packet << letter;
@@ -406,7 +422,25 @@ sf::Packet& operator<<(sf::Packet& packet, Client::Comunicate& comunicate)
 
 void operator>>(sf::Packet& packet, Client::Comunicate& comunicate)
 {
-	packet >> comunicate.operation >> comunicate.answer >> comunicate.messageId >> comunicate.sessionId >> comunicate.datasize;
+	uint32_t pom = 0;
+
+	packet >> pom;
+	pom >>= 10;
+	comunicate.messageId = pom;
+	pom >>= 16;
+	comunicate.answer = pom;
+	comunicate.operation = pom;
+
+	comunicate.answer <<= 5;
+	comunicate.answer >>= 5;
+
+	comunicate.operation >>= 3;
+
+	if (comunicate.operation == 1)comunicate.answer++;//nie wiem dlaczego ale bez tego totalnie nie dzia³a
+
+	packet >> comunicate.sessionId;
+	packet >> comunicate.datasize;
+
 	UINT8 data;
 	for (int32_t i = 0; i < comunicate.datasize; i++)
 	{

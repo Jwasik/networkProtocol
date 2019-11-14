@@ -3,7 +3,7 @@ KOMUNIKAT(3b), ODPOWIEDè(3b), ID_WIADOMOåCI(16b) , ID_SESJI(32b) ,ROZMIAR_DANYCH
 3b 3b 16b 32b 32b dane = 64b + (32b + 32b) + 32*x
 
 001 - sesja
-001 000 DataSize ClientName 0  - proúba o przydzielenie numeru sesji (od klienta do serwera)
+001 000 0 0 0  - proúba o przydzielenie numeru sesji (od klienta do serwera)
 001 011 0 0 0  - zakoÒczenie sesji
 001 110 0 0 0 - odmowa przy≥πczenia do serwera
 001 111 0 0 0 - przydzia≥ numeru sesji (od serwera do klienta)

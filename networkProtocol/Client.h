@@ -25,7 +25,7 @@ private:
 		UINT8 answer;//3b
 		int16_t messageId;//16b
 		uint32_t sessionId;//32b
-		int32_t datasize;//32b
+		uint32_t datasize;//32b
 		std::vector<UINT8> data;
 	};
 
