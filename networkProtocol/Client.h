@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <regex>
 #include <String>
+#include <bitset>
 #include <SFML/Graphics.hpp>
 #include <SFML/Network.hpp>
 

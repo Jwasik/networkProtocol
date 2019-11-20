@@ -226,7 +226,7 @@ void Client::addMessage(std::string message, int16_t messageId = 0)
 	newMessage.setCharacterSize(30);
 	newMessage.setPosition(sf::Vector2f(10, 693));
 	newMessage.setString(message);
-	if (messageId == 0)newMessage.setFillColor(sentColor);
+	if (messageId == 0)newMessage.setFillColor(serverColor);
 	else if (messageId == 0 - 1)newMessage.setFillColor(errorColor);
 	else if (messageId == 0 - 2)newMessage.setFillColor(serverColor);
 	else if (messageId == 0 - 3)newMessage.setFillColor(clientColor);
@@ -374,13 +374,11 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 		{
 			addMessage("Succesfully disconnected " + this->serverIP.toString(), 0 - 1);
 			this->serverIP = sf::IpAddress::None;
-			this->serverPort = 0;
 		}
 		else
 		{
 			addMessage("\nUnable to reach server, performing emergency cutoff" + this->serverIP.toString(), 0 - 1);
 			this->serverIP = sf::IpAddress::None;
-			this->serverPort = 0;
 		}
 		this->serverIP == sf::IpAddress::None;
 		messageId++;
@@ -401,52 +399,88 @@ void Client::ackMessage(int16_t messageId)
 
 sf::Packet& operator<<(sf::Packet& packet, Client::Comunicate& comunicate)
 {
-	uint32_t pom = 0;
-	pom += comunicate.operation;
-	pom <<= 3;
-	pom += comunicate.answer;
-	pom <<= 16;
-	pom += comunicate.messageId;
-	pom <<= 10;
-
-	packet << pom;
-	packet << comunicate.sessionId;
-	packet << comunicate.datasize;
+	packet.clear();
+	std::string msg = "";
+	msg += std::bitset< 3 >(comunicate.operation).to_string();
+	msg += std::bitset< 3 >(comunicate.answer).to_string();
+	msg += std::bitset< 32 >(comunicate.datasize).to_string();
 
 	for (auto& letter : comunicate.data)
 	{
-		packet << letter;
+		msg += std::bitset< 8 >(int(letter)).to_string();
 	}
+
+	msg += std::bitset< 32 >(comunicate.sessionId).to_string();
+	msg += std::bitset< 32 >(comunicate.messageId).to_string();
+
+	while (msg.length() % 32 != 0)
+	{
+		msg += '0';
+	}
+
+	std::cout << "msg.length()=" << msg.length() << std::endl;
+	std::cout << "prepared " << msg << std::endl;
+
+	UINT16 pom = 0;
+	while (msg.length() > 0)
+	{
+		std::string pom2 = msg.substr(0, 16);
+		pom = std::stoi(pom2, 0, 2);
+		msg.erase(0, 16);
+		packet << pom;
+	}
+	std::cout << "packet.size()=" << packet.getDataSize() << std::endl;
+
 	return packet;
 }
 
 void operator>>(sf::Packet& packet, Client::Comunicate& comunicate)
 {
-	uint32_t pom = 0;
+	std::cout << "datasize " << packet.getDataSize() << std::endl;
+	std::string msg = "";
+	UINT32 pom;
 
-	packet >> pom;
-	pom >>= 10;
-	comunicate.messageId = pom;
-	pom >>= 16;
-	comunicate.answer = pom;
-	comunicate.operation = pom;
-
-	comunicate.answer <<= 5;
-	comunicate.answer >>= 5;
-
-	comunicate.operation >>= 3;
-
-	if (comunicate.operation == 1)comunicate.answer++;//nie wiem dlaczego ale bez tego totalnie nie dzia³a
-
-	packet >> comunicate.sessionId;
-	packet >> comunicate.datasize;
-
-	UINT8 data;
-	for (int32_t i = 0; i < comunicate.datasize; i++)
+	while (!packet.endOfPacket())
 	{
-		packet >> data;
-		comunicate.data.push_back(data);
+		packet >> pom;
+		std::string s = std::bitset< 32 >(pom).to_string();
+		msg += s;
 	}
+	std::cout << "received bytes " << msg.length() << std::endl;
+	std::cout << "received " << msg << std::endl;
+
+	std::string pom2 = msg.substr(0, 3);
+	msg.erase(0, 3);
+	comunicate.operation = std::stoi(pom2, 0, 2);
+
+	pom2 = msg.substr(0, 3);
+	msg.erase(0, 3);
+	comunicate.answer = std::stoi(pom2, 0, 2);
+
+	pom2 = msg.substr(0, 32);
+	msg.erase(0, 32);
+	comunicate.datasize = std::stoi(pom2, 0, 2);
+
+	for (int i = 0; i < comunicate.datasize; i++)
+	{
+		pom2 = msg.substr(0, 8);
+		msg.erase(0, 8);
+		UINT8 data;
+		if (pom2.length() != 0)
+		{
+			data = std::stoi(pom2, 0, 2);
+			comunicate.data.push_back(data);
+		}
+	}
+
+	pom2 = msg.substr(0, 32);
+	msg.erase(0, 32);
+	comunicate.sessionId = std::stoi(pom2, 0, 2);
+
+	pom2 = msg.substr(0, 32);
+	std::cout << pom2.length() << std::endl;
+	msg.erase(0, 32);
+	comunicate.messageId = std::stoi(pom2, 0, 2);
 }
 
 std::string Client::to_string(Comunicate& com1)
