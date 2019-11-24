@@ -24,7 +24,7 @@ private:
 	{
 		UINT8 operation;//3b
 		UINT8 answer;//3b
-		int16_t messageId;//16b
+		uint16_t messageId;//16b
 		uint32_t sessionId;//32b
 		uint32_t datasize;//32b
 		std::vector<UINT8> data;
@@ -53,6 +53,8 @@ private:
 	void moveMessages(int, std::vector<std::pair<unsigned int, sf::Text>>&);
 	void interpreteCommand(std::string, std::vector<std::pair<unsigned int, sf::Text>>&, sf::Font&);
 	void ackMessage(int16_t);
+	void send(Comunicate&);
+	void retransmit(Comunicate&);
 
 public:
 	Client();

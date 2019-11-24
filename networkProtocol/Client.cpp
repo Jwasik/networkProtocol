@@ -93,18 +93,14 @@ void Client::run()
 
 							std::vector<UINT8> msg = toUINTtab(this->userText.getString().toAnsiString());
 							Comunicate message{ 7,0,this->messageId,this->sessionId,this->userText.getString().toAnsiString().length(),msg };
-
-							sf::Packet messagePacket;
-							messagePacket << message;
-							this->udpSocket.send(messagePacket, this->serverIP, this->serverPort);
-							this->messageId++;
+							std::cout << "sending message no: " << this->messageId << std::endl;
+							this->send(message);
 						}
 						std::cout << "Clearing string" << std::endl;
 						this->userText.setString("");
 						this->userText.setPosition(sf::Vector2f(10, 728));
 						std::cout << "String cleared" << std::endl;
 					}
-
 				}
 			}
 		}
@@ -123,7 +119,6 @@ void Client::run()
 				if (this->udpSocket.receive(receivedPacket, receivedIP, receivedPort) == sf::Socket::Done)
 				{
 					receivedPacket >> receivedComunicate;
-					std::cout << "rec" << (int)receivedComunicate.operation << ' ' << (int)receivedComunicate.answer << std::endl;
 					if (receivedComunicate.sessionId != this->sessionId)
 					{
 						std::cout << "wrong session ID " << receivedComunicate.sessionId << std::endl;
@@ -131,77 +126,99 @@ void Client::run()
 						break;
 					}
 
-					if (receivedComunicate.operation == 2)//invite
+					if (receivedComunicate.operation == 7 && receivedComunicate.answer == 3)//msg ack
 					{
-						if (receivedComunicate.answer == 0)
+						for (auto& message : messages)
 						{
-							//odebranie zaproszenia
-							addMessage("\nYou have new invitation. Type /accept or /deny", 0 - 2);
-
-							//wys³anie potwierdzenia
-							ackMessage(receivedComunicate.messageId);
-						}
-						if (receivedComunicate.answer == 1)//accept
-						{
-							//odebranie odpowiedzi
-							addMessage("\nClient accepted you invitation", 0 - 2);
-
-							//wys³anie potwierdzenia
-							ackMessage(receivedComunicate.messageId);
-						}
-						if (receivedComunicate.answer == 2)//deny
-						{
-							//odebranie odpowiedzi
-							addMessage("\nClient refused you invitation", 0 - 2);
-
-							//wys³anie potwierdzenia
-							ackMessage(receivedComunicate.messageId);
-						}
-						if (receivedComunicate.answer == 3)//b³¹d
-						{
-							for (auto& message : messages)
+							if (message.first == receivedComunicate.messageId)
 							{
-								if (message.first == receivedComunicate.messageId)
+								if (message.second.getFillColor() == deliveredColor)
 								{
-									if (message.second.getFillColor() == deliveredColor)
-									{
-										message.second.setFillColor(readedColor);
-									}
-									else message.second.setFillColor(deliveredColor);
+									message.second.setFillColor(readedColor);
 								}
+								else message.second.setFillColor(deliveredColor);
 							}
-							addMessage("Cannot invite client", 0 - 2);
 						}
 					}
-
-					else if (receivedComunicate.operation == 7)//msg
+					else
 					{
-						if (receivedComunicate.answer == 0)//msg 
-						{
-							//odebranie tekstu wiadomoœci
-							addMessage(this->to_string(receivedComunicate), 0 - 3);
+						this->ackMessage(receivedComunicate.messageId);//potwierdŸ odebranie wiadomoœci
 
-							//wys³anie potwierdzenia odebranie
-							ackMessage(receivedComunicate.messageId);
-
-						}
-						if (receivedComunicate.answer == 3)//msg ack
+						if (receivedComunicate.operation == 2)//invite
 						{
-							for (auto& message : messages)
+							if (receivedComunicate.answer == 0)
 							{
-								if (message.first == receivedComunicate.messageId)
+								//odebranie zaproszenia
+								addMessage("\nYou have new invitation. Type /accept or /deny", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 1)//accept
+							{
+								//odebranie odpowiedzi
+								addMessage("\nClient accepted you invitation", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 2)//deny
+							{
+								//odebranie odpowiedzi
+								addMessage("\nClient refused you invitation", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 3)//b³¹d
+							{
+								for (auto& message : messages)
 								{
-									if (message.second.getFillColor() == deliveredColor)
+									if (message.first == receivedComunicate.messageId)
 									{
-										message.second.setFillColor(readedColor);
+										if (message.second.getFillColor() == deliveredColor)
+										{
+											message.second.setFillColor(readedColor);
+										}
+										else message.second.setFillColor(deliveredColor);
 									}
-									else message.second.setFillColor(deliveredColor);
 								}
+								addMessage("Cannot invite client", receivedComunicate.messageId);
 							}
 						}
-						if (receivedComunicate.answer == 7)//msg server
+						else if (receivedComunicate.operation == 3)
 						{
-							addMessage(this->to_string(receivedComunicate), 0 - 1);
+							if (receivedComunicate.answer == 0)
+							{
+								addMessage("You are alone on serwer", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 1)
+							{
+								addMessage("There is one another client", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 2)
+							{
+								addMessage("Not found other client", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 3)
+							{
+								addMessage("Client left serwer", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 4)
+							{
+								addMessage("Already invited", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 5)
+							{
+								addMessage("You invitation has been accepted", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 6)
+							{
+								addMessage("You invitation has been denied", receivedComunicate.messageId);
+							}
+							if (receivedComunicate.answer == 7)
+							{
+								addMessage("You are not invited", receivedComunicate.messageId);
+							}
+						}
+						else if (receivedComunicate.operation == 7)//msg
+						{
+							if (receivedComunicate.answer == 0)//msg 
+							{
+								//odebranie tekstu wiadomoœci
+								addMessage(this->to_string(receivedComunicate), 0 - 3);
+							}
 						}
 					}
 				}
@@ -226,7 +243,7 @@ void Client::addMessage(std::string message, int16_t messageId = 0)
 	newMessage.setCharacterSize(30);
 	newMessage.setPosition(sf::Vector2f(10, 693));
 	newMessage.setString(message);
-	if (messageId == 0)newMessage.setFillColor(serverColor);
+	if (messageId >= 16384 || messageId == 0)newMessage.setFillColor(serverColor);
 	else if (messageId == 0 - 1)newMessage.setFillColor(errorColor);
 	else if (messageId == 0 - 2)newMessage.setFillColor(serverColor);
 	else if (messageId == 0 - 3)newMessage.setFillColor(clientColor);
@@ -270,8 +287,7 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 
 		sf::Packet joinPacket;
 		Comunicate c1 = { 1,0,0,0,0,std::vector<UINT8>() };
-		joinPacket << c1;
-		this->udpSocket.send(joinPacket, this->serverIP, this->serverPort);
+		this->send(c1);
 
 		sf::Clock connectionClock;
 		connectionClock.restart();
@@ -293,13 +309,17 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 		if (receivedComunicate.operation == 1 && receivedComunicate.answer == 7)
 		{
 			this->sessionId = receivedComunicate.sessionId;
-			addMessage("succesfully joined server " + this->serverIP.toString(), 0 - 1);
-			addMessage("session id is: " + std::to_string(receivedComunicate.sessionId), 0 - 1);
+			addMessage("succesfully joined server " + this->serverIP.toString(), receivedComunicate.messageId);
+			addMessage("session id is: " + std::to_string(receivedComunicate.sessionId), receivedComunicate.messageId);
+
+			c1 = Comunicate{ 1,5,receivedComunicate.messageId,this->sessionId,0,std::vector<UINT8>() };
+			this->retransmit(c1);
 		}
-		else if(receivedComunicate.operation == 1 && receivedComunicate.answer == 6)
+		else if (receivedComunicate.operation == 1 && receivedComunicate.answer == 6)
 		{
-			std::cout << "rec "<<receivedComunicate.operation << "---"+receivedComunicate.answer<< std::endl;
-			addMessage("cannot join server, server full", 0 - 1);
+			std::cout << "rec " << receivedComunicate.operation << "---" + receivedComunicate.answer << std::endl;
+			addMessage("cannot join server, server full", receivedComunicate.messageId);
+			this->ackMessage(receivedComunicate.messageId);
 			return;
 		}
 		else
@@ -307,59 +327,44 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 			addMessage("server cannot answer", 0 - 1);
 			return;
 		}
-
-		std::cout << "Joined succesfully" << std::endl;
 	}
 	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/invite")))
 	{
 		addMessage("Invite sent", messageId);
 		Comunicate c1 = { 2,0,messageId,this->sessionId,0,std::vector<UINT8>() };
 
-		sf::Packet invitePacket;
-		invitePacket << c1;
-
-		this->udpSocket.send(invitePacket, this->serverIP, this->serverPort);
-		messageId++;
+		this->send(c1);
 	}
 	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/accept.*")))
 	{
 		addMessage("Acceptation sent", messageId);
 		Comunicate c1 = { 2,1,messageId,this->sessionId,0,std::vector<UINT8>() };
 
-		sf::Packet invitePacket;
-		invitePacket << c1;
-
-		this->udpSocket.send(invitePacket, this->serverIP, this->serverPort);
-		messageId++;
+		this->send(c1);
 	}
 	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/deny.*")))
 	{
 		addMessage("Rejection sent", messageId);
 		Comunicate c1 = { 2,2,messageId,this->sessionId,0,std::vector<UINT8>() };
 
-		sf::Packet invitePacket;
-		invitePacket << c1;
-
-		this->udpSocket.send(invitePacket, this->serverIP, this->serverPort);
-		messageId++;
+		this->send(c1);
 	}
 	else if (std::regex_match(t1.begin(), t1.end(), std::regex("^/disconnect.*")))
 	{
 		if (this->serverIP == sf::IpAddress::None)
 		{
-			addMessage("You are not connected", messageId);
+			addMessage("You are not connected", 0-1);
 			return;
 		}
 		addMessage("Disconnecting...", messageId);
 		Comunicate c1 = { 1,3,messageId,this->sessionId,0,std::vector<UINT8>() };
-		sf::Packet disconnectPacket;
-		disconnectPacket << c1;
-		this->udpSocket.send(disconnectPacket,this->serverIP,this->serverPort);
+		this->send(c1);
 
+		sf::Packet receivedPacket;
 		sf::Clock connectionClock;
 		sf::IpAddress receivedAddress;
 		unsigned short receivedPort = 0;
-		while (this->udpSocket.receive(disconnectPacket, receivedAddress, receivedPort) != sf::Socket::Status::Done)
+		while (this->udpSocket.receive(receivedPacket, receivedAddress, receivedPort) != sf::Socket::Status::Done)
 		{
 			if (connectionClock.getElapsedTime().asSeconds() > 2)
 			{
@@ -368,12 +373,13 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 			}
 		}
 		Comunicate receivedComunicate;
-		disconnectPacket >> receivedComunicate;
+		receivedPacket >> receivedComunicate;
 
-		if (receivedComunicate.operation == 1 && receivedComunicate.answer == 3)
+		if (receivedComunicate.operation == 1 && receivedComunicate.answer == 4)
 		{
 			addMessage("Succesfully disconnected " + this->serverIP.toString(), 0 - 1);
 			this->serverIP = sf::IpAddress::None;
+			c1 = Comunicate{ 1,1,messageId,this->sessionId,0,std::vector<UINT8>() };
 		}
 		else
 		{
@@ -381,7 +387,6 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 			this->serverIP = sf::IpAddress::None;
 		}
 		this->serverIP == sf::IpAddress::None;
-		messageId++;
 	}
 	else
 	{
@@ -391,10 +396,28 @@ void Client::interpreteCommand(std::string t1, std::vector<std::pair<unsigned in
 
 void Client::ackMessage(int16_t messageId)
 {
-	Comunicate c1{7,3,messageId,this->sessionId,0,std::vector<UINT8>()};
+	std::cout << "sending ack to: " << messageId << std::endl;
+	Comunicate c1{ 7,3,messageId,this->sessionId,0,std::vector<UINT8>() };
 	sf::Packet ackPacket;
 	ackPacket << c1;
 	this->udpSocket.send(ackPacket, this->serverIP, this->serverPort);
+}
+
+void Client::send(Comunicate& com)
+{
+	com.messageId = this->messageId;
+	this->messageId++;
+	sf::Packet packet;
+	packet << com;
+	this->udpSocket.send(packet, this->serverIP, this->serverPort);
+
+}
+
+void Client::retransmit(Comunicate& com)
+{
+	sf::Packet packet;
+	packet << com;
+	this->udpSocket.send(packet, this->serverIP, this->serverPort);
 }
 
 sf::Packet& operator<<(sf::Packet& packet, Client::Comunicate& comunicate)
@@ -413,52 +436,49 @@ sf::Packet& operator<<(sf::Packet& packet, Client::Comunicate& comunicate)
 	msg += std::bitset< 32 >(comunicate.sessionId).to_string();
 	msg += std::bitset< 32 >(comunicate.messageId).to_string();
 
-	while (msg.length() % 32 != 0)
+	while (msg.length() % 8 != 0)
 	{
 		msg += '0';
 	}
-
-	std::cout << "msg.length()=" << msg.length() << std::endl;
 	std::cout << "prepared " << msg << std::endl;
 
-	UINT16 pom = 0;
+	UINT8 pom = 0;
 	while (msg.length() > 0)
 	{
-		std::string pom2 = msg.substr(0, 16);
+		std::string pom2 = msg.substr(0, 8);
 		pom = std::stoi(pom2, 0, 2);
-		msg.erase(0, 16);
+		msg.erase(0, 8);
 		packet << pom;
 	}
-	std::cout << "packet.size()=" << packet.getDataSize() << std::endl;
-
 	return packet;
 }
 
 void operator>>(sf::Packet& packet, Client::Comunicate& comunicate)
 {
-	std::cout << "datasize " << packet.getDataSize() << std::endl;
 	std::string msg = "";
-	UINT32 pom;
+	UINT8 pom;
 
 	while (!packet.endOfPacket())
 	{
 		packet >> pom;
-		std::string s = std::bitset< 32 >(pom).to_string();
+		std::string s = std::bitset< 8 >(pom).to_string();
 		msg += s;
 	}
-	std::cout << "received bytes " << msg.length() << std::endl;
 	std::cout << "received " << msg << std::endl;
 
 	std::string pom2 = msg.substr(0, 3);
 	msg.erase(0, 3);
+	if (pom2.length() == 0)return;
 	comunicate.operation = std::stoi(pom2, 0, 2);
 
 	pom2 = msg.substr(0, 3);
 	msg.erase(0, 3);
+	if (pom2.length() == 0)return;
 	comunicate.answer = std::stoi(pom2, 0, 2);
 
 	pom2 = msg.substr(0, 32);
 	msg.erase(0, 32);
+	if (pom2.length() == 0)return;
 	comunicate.datasize = std::stoi(pom2, 0, 2);
 
 	for (int i = 0; i < comunicate.datasize; i++)
@@ -478,9 +498,8 @@ void operator>>(sf::Packet& packet, Client::Comunicate& comunicate)
 	comunicate.sessionId = std::stoi(pom2, 0, 2);
 
 	pom2 = msg.substr(0, 32);
-	std::cout << pom2.length() << std::endl;
-	msg.erase(0, 32);
-	comunicate.messageId = std::stoi(pom2, 0, 2);
+	if (pom2.length() != 0)comunicate.messageId = std::stoi(pom2, 0, 2);
+
 }
 
 std::string Client::to_string(Comunicate& com1)
